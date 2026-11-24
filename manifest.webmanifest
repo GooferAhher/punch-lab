@@ -1,0 +1,25 @@
+{
+  "name": "Punch Lab VR",
+  "short_name": "Punch Lab",
+  "description": "Punch a crash-test dummy through a brick wall. A WebXR test for Meta Quest 3.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b1e22",
+  "theme_color": "#ffd23f",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "ovr_package_name": "io.github.gooferahher.punchlab"
+}
