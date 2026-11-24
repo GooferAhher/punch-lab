@@ -44,6 +44,7 @@ input[type=range]{flex:1;accent-color:#ffd23f;height:32px}
 <p>Quest 3: Enter VR. Hold grip for a fist, let go for an open hand. Desktop: click the villain to punch.</p>
 <div class="row"><button id="vr" disabled>Enter VR</button><button id="rs">Reset (R)</button></div>
 <div class="row"><button id="tsp" aria-pressed="false">Spear / blade hand: off</button><button id="trk" aria-pressed="false">Rock fist: off</button></div>
+<div class="row"><button id="tan" aria-pressed="true">Anchor villain: ON</button></div>
 <div class="row"><button id="sm">Slow-mo: on</button><button id="cm">View: first person</button></div>
 <div class="k">Desktop tests</div>
 <div class="row"><button id="dp">Punch head</button><button id="dc">Punch chest</button><button id="ds">Stab gut</button><button id="dx">Slash</button></div>
@@ -220,7 +221,7 @@ function drawHud(){hx.clearRect(0,0,512,256);hx.fillStyle='rgba(14,16,20,.88)';h
  hx.strokeStyle='#ffd23f';hx.lineWidth=4;hx.stroke();hx.fillStyle='#ffd23f';hx.font='bold 40px system-ui,sans-serif';hx.fillText('PUNCH LAB',26,56);
  hx.fillStyle='#f3f1ea';hx.font='600 27px system-ui,sans-serif';hx.fillText(`Strength ${strength}×   Slow-mo ${slowmo?'on':'off'}`,26,100);
  hx.fillStyle=spearOn?'#ff6b5b':'#bdb9ad';hx.fillText(`Spear/blade hand ${spearOn?'ON':'off'}`,26,140);hx.fillStyle=rockOn?'#ff6b5b':'#bdb9ad';hx.fillText(`Rock fist ${rockOn?'ON':'off'}`,300,140);
- hx.fillStyle='#bdb9ad';hx.font='22px system-ui,sans-serif';hx.fillText('A reset · B slow-mo · X spear/blade · Y rock fist',26,190);hx.fillText('Grip = fist · Right stick up/down = strength',26,226);
+ hx.fillStyle='#bdb9ad';hx.font='22px system-ui,sans-serif';hx.fillText(`A reset · B slow-mo · X spear/blade · Y rock fist`,26,184);hx.fillText(`Grip = fist · R-stick = strength · L-stick click = anchor ${anchorOn?'ON':'off'}`,26,222);
  gl.bindTexture(gl.TEXTURE_2D,hudT);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,hc);gl.generateMipmap(gl.TEXTURE_2D);
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);hudDirty=false;}
 const PANEL_POS=[-2.3,1.55,-2.6],PANEL_R=(()=>{const t=Math.atan2(2.3,2.6),c=Math.cos(t),s=Math.sin(t);return[c,0,s,0,1,0,-s,0,c];})();
@@ -330,7 +331,7 @@ function driveHand(hd,h){const b=hd.body;if(b.pinned)return;
  const ws=len(w);b.w=ws>40?scl(w,40/ws):w;}
 function step(h){stepN++;const sup=stepN%8===0;
  for(const hd of hands)driveHand(hd,h);
- for(const b of bodies){if(b.dyn&&b.kind!=='hand'){b.v[1]-=9.81*h;const ad=1-.6*h;b.w[0]*=ad;b.w[1]*=ad;b.w[2]*=ad;}b.upd();if(b.box)b.sup=false;}
+ for(const b of bodies){if(b.dyn&&b.kind!=='hand'){b.v[1]-=9.81*h;const ad=1-(anchorOn&&b.kind==='foe'?2.5:.6)*h;if(anchorOn&&b.kind==='foe'){const ld=1-1.2*h;b.v[0]*=ld;b.v[2]*=ld;}b.w[0]*=ad;b.w[1]*=ad;b.w[2]*=ad;}b.upd();if(b.box)b.sup=false;}
  nC=0;
  for(let i=1;i<bodies.length;i++){const b=bodies[i];let j=i-1;while(j>=0&&bodies[j].lo[0]>b.lo[0]){bodies[j+1]=bodies[j];j--;}bodies[j+1]=b;}
  for(let i=0;i<bodies.length;i++){const A=bodies[i];if(A.dyn||(sup&&!A.pinned))ground(A);
@@ -404,7 +405,9 @@ function makeFoe(){const parts={};
   J('ua'+L,'la'+L,[s*.25,1.24,0],[[[1,0,0],.3],[[0,1,0],2.3]]);
   J('pelvis','ul'+L,[s*.095,.9,0],[[[0,1,0],1.5],[[1,0,0],.9]]);
   J('ul'+L,'ll'+L,[s*.095,.46,0],[[[1,0,0],.25],[[0,1,0],2.3]]);}
- foe={parts,list:Object.values(parts),launched:false};}
+ foe={parts,list:Object.values(parts),launched:false};
+ if(anchorOn){const pv=parts.pelvis,post=new Body({p:pv.x,m:1,I:[1,1,1],kind:'post',pinned:true});post.upd();
+  joints.push({P:post,C:pv,aP:[0,0,0],aC:[0,0,0],Ki:new Float64Array(9),lims:[[[0,1,0],.3],[[0,0,1],.45]].map(([a,lim])=>({a,lim})),post:true});}}
 // ----- player hands -----
 const hands=[-1,1].map(side=>({side,p:[0,1.2,0],q:[0,0,0,1],pPrev:[0,1.2,0],qPrev:[0,0,0,1],tv:[0,0,0],prev:null,curl:0,cd:0,ncT:0,vis:true,evt:null,impale:null,blood:0,body:null,items:[],b4:false,b5:false,ax:false}));
 function handSph(side,c){const s=side*PALM_FLIP,o=(a,b)=>lerp3(a,b,c);
@@ -416,7 +419,7 @@ function handSegs(side,c){const s=side*PALM_FLIP,S=[],ys=[.03,.01,-.01,-.03],sc=
  for(let f=0;f<4;f++){let p=[0,ys[f],-.048],a=0;for(let k=0;k<3;k++){a+=c*cr[k];const d=[-s*Math.sin(a),0,-Math.cos(a)],q=add(p,scl(d,L[k]*sc[f]));S.push([p,q,(f===3?.0088:.0098)*(1-k*.08)]);p=q;}}
  const t0=[-s*.014,.034,.02],d1=norm(lerp3(norm([-s*.35,.6,-.72]),norm([-s*.85,-.1,-.5]),c)),t1=add(t0,scl(d1,.042)),d2=norm(lerp3(norm([-s*.3,.55,-.78]),norm([-s*.45,-.65,-.6]),c)),t2=add(t1,scl(d2,.032));
  S.push([t0,t1,.0122],[t1,t2,.0108]);return S;}
-let fx=null,strength=5,slowmo=true,camMode='fp',spearOn=false,rockOn=false;
+let fx=null,strength=5,slowmo=true,camMode='fp',spearOn=false,rockOn=false,anchorOn=true;
 const goreOn=()=>spearOn||rockOn;
 function doReset(){seed=7;bodies=[];joints=[];emitters=[];pN=0;splats.length=0;splatHead=0;splatDirty=true;makeWall();makeFoe();makeHands();
  for(const hd of hands){if(!xr){hd.p=restPos(hd.side);hd.q=rToQ(basisFwd(camBasis(CAMS.fp).f));}hd.pPrev=hd.p.slice();hd.qPrev=hd.q.slice();hd.prev=null;hd.tv=[0,0,0];hd.evt=null;hd.impale=null;hd.cd=.15;hd.ncT=0;hd.blood=0;hd.body.x=hd.p.slice();hd.body.q=hd.q.slice();}
@@ -586,6 +589,7 @@ function handsXR(frame,dt){for(const h of hands)h.vis=false;
   if(gp){const b=gp.buttons,pr=k=>!!(b[k]&&b[k].pressed),right=hd.side>0;
    if(pr(4)&&!hd.b4){if(right){doReset();needRC=true;}else setSpear(!spearOn);}hd.b4=pr(4);
    if(pr(5)&&!hd.b5){if(right)setSlow(!slowmo);else setRock(!rockOn);}hd.b5=pr(5);
+   if(!right){if(pr(3)&&!hd.b3)setAnchor(!anchorOn);hd.b3=pr(3);}
    if(right){const ay=gp.axes[3]||0;if(Math.abs(ay)>.7&&!hd.ax){setStrength(strength+(ay<0?1:-1));hd.ax=true;}else if(Math.abs(ay)<.3)hd.ax=false;}}}}
 function xrFrame(t,frame){const s=frame.session;s.requestAnimationFrame(xrFrame);
  if(needRC){const vp=frame.getViewerPose(baseRef);if(vp){recenter(vp.transform);needRC=false;}}
@@ -605,12 +609,13 @@ function setStrength(v){strength=Math.max(1,Math.min(10,v));$('str').value=stren
 function setSlow(v){slowmo=v;$('sm').textContent='Slow-mo: '+(v?'on':'off');hudDirty=true;}
 function setSpear(v){spearOn=v;$('tsp').textContent='Spear / blade hand: '+(v?'ON':'off');$('tsp').setAttribute('aria-pressed',v);hudDirty=true;}
 function setRock(v){rockOn=v;$('trk').textContent='Rock fist: '+(v?'ON':'off');$('trk').setAttribute('aria-pressed',v);hudDirty=true;}
+function setAnchor(v){anchorOn=v;$('tan').textContent='Anchor villain: '+(v?'ON':'off');$('tan').setAttribute('aria-pressed',v);hudDirty=true;doReset();}
 function setCam(m){camMode=m;$('cm').textContent='View: '+(m==='fp'?'first person':'side');}
 const fpart=n=>foe.parts[n];
 function test(type){au();const P={head:()=>{const h=fpart('head');return['punch',h,add(h.x,[0,0,.1])]},chest:()=>{const c=fpart('chest');return['punch',c,add(c.x,[0,.02,.12])]},
  stab:()=>{const a=fpart('abdomen');return['stab',a,add(a.x,[0,0,.1])]},slash:()=>{const a=fpart('abdomen');return['slash',a,a.x.slice()]}}[type]();startAct(...P);}
 $('rs').onclick=()=>doReset();$('sm').onclick=()=>setSlow(!slowmo);$('cm').onclick=()=>setCam(camMode==='fp'?'side':'fp');
-$('tsp').onclick=()=>setSpear(!spearOn);$('trk').onclick=()=>setRock(!rockOn);
+$('tsp').onclick=()=>setSpear(!spearOn);$('tan').onclick=()=>setAnchor(!anchorOn);$('trk').onclick=()=>setRock(!rockOn);
 $('dp').onclick=()=>test('head');$('dc').onclick=()=>test('chest');$('ds').onclick=()=>test('stab');$('dx').onclick=()=>test('slash');
 $('str').oninput=e=>setStrength(+e.target.value);$('vr').onclick=enterVR;
 $('min').onclick=()=>{const m=$('ui').classList.toggle('mini');$('min').textContent=m?'+':'–';};
@@ -629,7 +634,7 @@ function loop(t){if(xr)return;requestAnimationFrame(loop);if(manual)return;const
 requestAnimationFrame(loop);
 window.__lab={manual(){manual=true},advance(dt){const t0=performance.now();update(dt);const t1=performance.now();renderDesk();return t1-t0;},
  frame(q){return cv.toDataURL('image/jpeg',q||.9)},cam(m,e,t){if(e)CAMS[m]={e,t,fov:CAMS[m]?CAMS[m].fov:55};setCam(m)},reset:doReset,ui(v){$('ui').style.display=v?'':'none'},
- test,setSpear,setRock,setStrength,_dbg(){return{fx,act:act&&act.type,hands:hands.map(h=>({ncT:h.ncT,nc:h.body.nc.size,imp:!!h.impale,pin:h.body.pinned})),foe:foe.list.map(b=>[b.name,b.pinned,b.sleeping,b.x.map(v=>+v.toFixed(2)),b.clips.length,b.holes.length])}},_h(){return act?hands[act.side>0?1:0]:hands[punchSide>0?1:0]},
+ test,setSpear,setRock,setStrength,setAnchor,_dbg(){return{fx,act:act&&act.type,hands:hands.map(h=>({ncT:h.ncT,nc:h.body.nc.size,imp:!!h.impale,pin:h.body.pinned})),foe:foe.list.map(b=>[b.name,b.pinned,b.sleeping,b.x.map(v=>+v.toFixed(2)),b.clips.length,b.holes.length])}},_h(){return act?hands[act.side>0?1:0]:hands[punchSide>0?1:0]},
  stats(){return{bodies:bodies.length,joints:joints.length,foeParts:foe.list.length,particles:pN,splats:splats.length,impale:hands.map(h=>!!h.impale),
   head:fpart('head').x.map(v=>+v.toFixed(2)),chest:fpart('chest').x.map(v=>+v.toFixed(2)),hand:hands[1].body.x.map(v=>+v.toFixed(2)),holes:foe.list.reduce((a,b)=>a+b.holes.length,0),cuts:foe.list.filter(b=>b.clips.length).length}}};
 }
